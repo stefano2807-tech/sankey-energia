@@ -1,6 +1,74 @@
-Potenza importata dalla rete [1.092] Potenza totale utilizzata Ottobre 2026 #ec1313
-Potenza esportata dal fotovoltaico [0.18] Potenza totale utilizzata Ottobre 2026 #009900
-Potenza totale utilizzata Ottobre 2026 [0.888] Potenza Ed. Principale
-Potenza totale utilizzata Ottobre 2026 [0.384] Potenza Ed. Laboratorio
+// SankeyMATIC diagram inputs - Saved: 22/11/2026, 15:54:58
+// https://sankeymatic.com/build/
+
+// === Nodes and Flows ===
+
+// Esempio Mappa di sintesi:
+
+Potenza importata dalla rete [1.092] Potenza totale utilizzata #ec1313
+Potenza esportata dal fotovoltaico [0.18] Potenza totale utilizzata #009900
+Potenza totale utilizzata [0.888] Potenza Ed. Principale
+Potenza totale utilizzata [0.384] Potenza Ed. Laboratorio
 Potenza Ed. Laboratorio [0.078] Potenza UTA-Clima
 Potenza Ed. Laboratorio [0.306] Potenza altre utenze
+
+// === Settings ===
+
+size w 800
+  h 700
+margin l 4
+  r 40
+  t 83
+  b 0
+bg color #ffffff
+  transparent N
+node w 7
+  h 49
+  spacing 50.5
+  border 10
+  theme c
+  color #888888
+  opacity 0
+flow curvature 0.5
+  inheritfrom none
+  color #ec1313
+  opacity 0.45
+layout order automatic
+  justifyorigins N
+  justifyends N
+  reversegraph N
+  attachincompletesto nearest
+labels color #000000
+  hide N
+  highlight 0.55
+  fontface sans-serif
+  linespacing 0.2
+  relativesize 115
+  magnify 110
+labelname appears Y
+  size 15
+  weight 400
+labelvalue appears Y
+  fullprecision Y
+  position above
+  weight 400
+labelposition autoalign 1
+  scheme auto
+  first before
+  breakpoint 5
+value format ',.'
+  prefix ''
+  suffix ' kW'
+themeoffset a 5
+  b 6
+  c 0
+  d 0
+meta mentionsankeymatic N
+  listimbalances Y
+
+// === Moved Nodes ===
+
+move Potenza esportata dal fotovoltaico -0.60023, -0.17942
+move Potenza Ed. Laboratorio 0, -0.22077
+move Potenza UTA-Clima -0.05794, 0.00836
+move Potenza altre utenze -0.04403, -0.15808
