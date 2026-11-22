@@ -1,0 +1,32 @@
+name: Aggiorna Sankey
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Genera diagramma
+        id: gen
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+          FTP_DIR: ${{ secrets.FTP_DIR }}
+          PERIODO: "Ottobre 2026"
+        run: python genera_sankey.py
+      - name: Salva nel repository
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add output
+          git diff --staged --quiet || (git commit -m "Dati aggiornati al ${{ steps.gen.outputs.ultimo }}" && git push)
