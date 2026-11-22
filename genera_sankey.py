@@ -1,7 +1,12 @@
 import os, re, csv, io, ftplib
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
-import plotly.graph_objects as go
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from matplotlib.path import Path
+from matplotlib.patches import PathPatch, FancyBboxPatch
+from matplotlib.colors import to_rgb
 
 HOST = os.environ["FTP_HOST"]
 PORT = int(os.environ.get("FTP_PORT") or "21")
@@ -116,13 +121,13 @@ for nome, v in (("F", F), ("G", G)):
         print(f"ATTENZIONE: {nome} negativo ({v}), impostato a 0")
 F, G = max(F, 0), max(G, 0)
 
-TOT = f"Potenza totale utilizzata {PERIODO}"
+TOT_TXT = f"Potenza totale utilizzata {PERIODO}"
 GRIGIO = "#999999"
 flussi = [
-    ("Potenza importata dalla rete", F, TOT, "#ec1313"),
-    ("Potenza esportata dal fotovoltaico", B, TOT, "#009900"),
-    (TOT, D, "Potenza Ed. Principale", GRIGIO),
-    (TOT, C, "Potenza Ed. Laboratorio", GRIGIO),
+    ("Potenza importata dalla rete", F, TOT_TXT, "#ec1313"),
+    ("Potenza esportata dal fotovoltaico", B, TOT_TXT, "#009900"),
+    (TOT_TXT, D, "Potenza Ed. Principale", GRIGIO),
+    (TOT_TXT, C, "Potenza Ed. Laboratorio", GRIGIO),
     ("Potenza Ed. Laboratorio", A, "Potenza UTA-Clima", GRIGIO),
     ("Potenza Ed. Laboratorio", G, "Potenza altre utenze", GRIGIO),
 ]
@@ -198,87 +203,141 @@ with open("output/sankeymatic.txt", "w", encoding="utf-8") as fh:
         fh.write(f"{s} [{v:g}] {t}{colore}\n")
     fh.write("\n" + IMPOSTAZIONI.strip() + "\n")
 
-# 2) immagine (stessi parametri di SankeyMATIC, per quanto possibile)
-nodi = []
-for s, v, t, c in flussi:
-    for n in (s, t):
-        if n not in nodi:
-            nodi.append(n)
+# ===================== IMMAGINE =====================
+# ---- impostazioni (pixel su una tela di 1600 x 1400) ----
+W, H, DPI = 1600, 1400, 100
+LARG_NODO = 34          # larghezza dei blocchi
+MARGINE_NODO = 10       # spazio sopra/sotto i flussi dentro il blocco
+ALTEZZA_FLUSSO_TOT = 606  # altezza (px) del flusso del blocco "totale"
+OPACITA_FLUSSI = 0.45
+COLORE_NODI = "#0f4d3c"
+COLORE_ROSSO = "#ec1313"
+MOSTRA_DATA = True       # metti False per togliere la scritta in alto
+CARATTERE = ["Arial", "Liberation Sans", "Helvetica", "DejaVu Sans"]
 
-# valore di ogni blocco = totale dei flussi che entrano o escono
-entrata = {n: 0 for n in nodi}
-uscita = {n: 0 for n in nodi}
+NOME_IMG = {TOT_TXT: "Potenza totale utilizzata"}   # nome mostrato nel blocco
+
+# posizione di ogni blocco: (x del lato sinistro, y del centro), in pixel
+POS = {
+    "Potenza importata dalla rete":       (382, 592),
+    "Potenza esportata dal fotovoltaico": (382, 960),
+    TOT_TXT:                              (670, 680),
+    "Potenza Ed. Principale":             (1032, 515),
+    "Potenza Ed. Laboratorio":            (958, 867),
+    "Potenza UTA-Clima":                  (1191, 754),
+    "Potenza altre utenze":               (1187, 999),
+}
+SINISTRA = {"Potenza importata dalla rete", "Potenza esportata dal fotovoltaico"}
+CON_RIQUADRO = {TOT_TXT, "Potenza Ed. Laboratorio"}
+
+nodi = list(POS)
+entrata = {n: 0.0 for n in nodi}
+uscita = {n: 0.0 for n in nodi}
 for s, v, t, c in flussi:
     uscita[s] += v
     entrata[t] += v
-# valore sopra, nome sotto (labelvalue position above)
-etichette = [f"{max(entrata[n], uscita[n]):,.3f} kW<br>{n}" for n in nodi]
+valore = {n: max(entrata[n], uscita[n]) for n in nodi}
+
+tot = valore[TOT_TXT] or 1.0
+k = ALTEZZA_FLUSSO_TOT / tot                      # pixel per kW
+alt = {n: valore[n] * k + 2 * MARGINE_NODO for n in nodi}
+top = {n: POS[n][1] - alt[n] / 2 for n in nodi}
+xl = {n: POS[n][0] for n in nodi}
+
+# posizione verticale di ogni flusso dentro i blocchi (dall'alto in basso)
+y_out, y_in = {}, {}
+for n in nodi:
+    cur = top[n] + MARGINE_NODO
+    for i in sorted((i for i, f in enumerate(flussi) if f[0] == n),
+                    key=lambda i: POS[flussi[i][2]][1]):
+        y_out[i] = cur
+        cur += flussi[i][1] * k
+    cur = top[n] + MARGINE_NODO
+    for i in sorted((i for i, f in enumerate(flussi) if f[2] == n),
+                    key=lambda i: POS[flussi[i][0]][1]):
+        y_in[i] = cur
+        cur += flussi[i][1] * k
+
+plt.rcParams["font.family"] = "sans-serif"
+plt.rcParams["font.sans-serif"] = CARATTERE
+fig = plt.figure(figsize=(W / DPI, H / DPI), dpi=DPI, facecolor="white")
+ax = fig.add_axes([0, 0, 1, 1])
+ax.set_xlim(0, W)
+ax.set_ylim(H, 0)
+ax.axis("off")
 
 
-def rgba(hex_color, alpha):
-    h = hex_color.lstrip("#")
-    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-    return f"rgba({r},{g},{b},{alpha})"
+def pt(px):
+    return px * 72 / DPI
 
 
-# i flussi senza colore usano il colore di default di SankeyMATIC (#ec1313)
-FLUSSO_DEFAULT = "#ec1313"
-colori_link = [rgba(FLUSSO_DEFAULT if c == GRIGIO else c, 0.45)
-               for *_, c in flussi]
+# flussi
+for i, (s, v, t, c) in enumerate(flussi):
+    col = to_rgb(COLORE_ROSSO if c == GRIGIO else c)
+    x0, x1 = xl[s] + LARG_NODO, xl[t]
+    xm = (x0 + x1) / 2
+    ys, yt, th = y_out[i], y_in[i], v * k
+    verts = [(x0, ys), (xm, ys), (xm, yt), (x1, yt),
+             (x1, yt + th),
+             (xm, yt + th), (xm, ys + th), (x0, ys + th),
+             (x0, ys)]
+    codes = [Path.MOVETO, Path.CURVE4, Path.CURVE4, Path.CURVE4,
+             Path.LINETO,
+             Path.CURVE4, Path.CURVE4, Path.CURVE4,
+             Path.CLOSEPOLY]
+    ax.add_patch(PathPatch(Path(verts, codes), facecolor=col + (OPACITA_FLUSSI,),
+                           edgecolor="none", zorder=2))
 
-# posizioni: colonna (x) e altezza (y) di base, a cui si somma lo "move"
-# di SankeyMATIC. Valori da 0 a 1 (y=0 in alto).
-BASE = {
-    "Potenza importata dalla rete":       (0.001, 0.30),
-    "Potenza esportata dal fotovoltaico": (0.001, 0.85),
-    TOT:                                  (0.34, 0.55),
-    "Potenza Ed. Principale":             (0.67, 0.30),
-    "Potenza Ed. Laboratorio":            (0.67, 0.75),
-    "Potenza UTA-Clima":                  (0.999, 0.65),
-    "Potenza altre utenze":               (0.999, 0.95),
-}
-MOVE = {
-    "Potenza esportata dal fotovoltaico": (-0.00232, -0.21948),
-    "Potenza Ed. Laboratorio":            (0, -0.24171),
-    "Potenza UTA-Clima":                  (-0.06257, -0.03342),
-    "Potenza altre utenze":               (-0.0672, -0.18749),
-    "Potenza Ed. Principale":             (0.08575, 0.01727),
-}
+# blocchi
+for n in nodi:
+    ax.add_patch(plt.Rectangle((xl[n], top[n]), LARG_NODO, alt[n],
+                               facecolor=COLORE_NODI, edgecolor="none", zorder=3))
 
+# etichette: valore grande sopra, nome sotto
+etichette = []
+for n in nodi:
+    yc = POS[n][1]
+    if n in SINISTRA:
+        x, ha = xl[n] - 12, "right"
+    else:
+        x, ha = xl[n] + LARG_NODO + 12, "left"
+    tv = ax.text(x, yc - 16, f"{valore[n]:.3f} kW", ha=ha, va="center",
+                 fontsize=pt(36), color="black", zorder=6)
+    tn = ax.text(x, yc + 19, NOME_IMG.get(n, n), ha=ha, va="center",
+                 fontsize=pt(26), color="black", zorder=6)
+    if n in SINISTRA:  # se il nome e' troppo lungo, rimpicciolisci il carattere
+        spazio = x - 18
+        larg = tn.get_window_extent(fig.canvas.get_renderer()).width
+        if larg > spazio:
+            tn.set_fontsize(pt(26) * spazio / larg)
+    etichette.append((n, tv, tn))
 
-def pos(n):
-    x, y = BASE[n]
-    dx, dy = MOVE.get(n, (0, 0))
-    return (min(max(x + dx, 0.001), 0.999),
-            min(max(y + dy, 0.001), 0.999))
+# riquadro chiaro dietro le etichette dei blocchi centrali
+fig.canvas.draw()
+rend = fig.canvas.get_renderer()
+inv = ax.transData.inverted()
+for n, tv, tn in etichette:
+    if n not in CON_RIQUADRO:
+        continue
+    pts = []
+    for t_ in (tv, tn):
+        bb = t_.get_window_extent(rend)
+        pts += [inv.transform((bb.x0, bb.y0)), inv.transform((bb.x1, bb.y1))]
+    x0 = min(p[0] for p in pts) - 9
+    x1 = max(p[0] for p in pts) + 9
+    y0 = min(p[1] for p in pts) - 8
+    y1 = max(p[1] for p in pts) + 8
+    ax.add_patch(FancyBboxPatch((x0, y0), x1 - x0, y1 - y0,
+                                boxstyle="round,pad=0,rounding_size=10",
+                                facecolor=(1, 1, 1, 0.65), edgecolor="none",
+                                zorder=2.5))
 
+if MOSTRA_DATA:
+    ax.text(30, 50, f"{PERIODO} - dati aggiornati al {ultimo}",
+            ha="left", va="center", fontsize=pt(26), color="#555555")
 
-xs = [pos(n)[0] for n in nodi]
-ys = [pos(n)[1] for n in nodi]
-
-fig = go.Figure(go.Sankey(
-    arrangement="fixed",
-    valueformat=",.3f",
-    valuesuffix=" kW",
-    node=dict(label=etichette, x=xs, y=ys, pad=50, thickness=7,
-              color="#888888", line=dict(color="#888888", width=0)),
-    link=dict(
-        source=[nodi.index(s) for s, *_ in flussi],
-        target=[nodi.index(t) for _, _, t, _ in flussi],
-        value=[v for _, v, _, _ in flussi],
-        color=colori_link,
-    ),
-))
-fig.update_layout(
-    title=dict(text=f"Flussi di potenza - {PERIODO}<br>"
-                    f"<sup>Dati aggiornati al {ultimo}</sup>",
-               x=0.02),
-    font=dict(family="sans-serif", size=15, color="#000000"),
-    width=800, height=700,
-    margin=dict(l=4, r=40, t=83, b=0),
-    paper_bgcolor="#ffffff",
-)
-fig.write_image("output/sankey.png", scale=2)
+fig.savefig("output/sankey.png", dpi=DPI, facecolor="white")
+plt.close(fig)
 
 # 3) data e ora dell'aggiornamento
 with open("output/ultimo_aggiornamento.txt", "w", encoding="utf-8") as fh:
