@@ -333,7 +333,7 @@ for n, tv, tn in etichette:
                                 zorder=2.5))
 
 if MOSTRA_DATA:
-    ax.text(30, 50, f"{PERIODO} - dati aggiornati al {ultimo}",
+    ax.text(30, 50, f"Mappa distribuzione di Potenza attiva - dati aggiornati al {ultimo}",
             ha="left", va="center", fontsize=pt(26), color="#555555")
 
 fig.savefig("output/sankey.png", dpi=DPI, facecolor="white")
