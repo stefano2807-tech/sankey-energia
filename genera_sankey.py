@@ -142,16 +142,28 @@ for s, v, t, c in flussi:
         if n not in nodi:
             nodi.append(n)
 
+# valore di ogni blocco = totale dei flussi che entrano o escono
+entrata = {n: 0 for n in nodi}
+uscita = {n: 0 for n in nodi}
+for s, v, t, c in flussi:
+    uscita[s] += v
+    entrata[t] += v
+etichette = [f"{n}<br>{max(entrata[n], uscita[n]):.3f} kW" for n in nodi]
+
+
 def rgba(hex_color, alpha):
     h = hex_color.lstrip("#")
     r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
     return f"rgba({r},{g},{b},{alpha})"
 
+
 colori_link = [rgba(c, 0.6) if c != GRIGIO else rgba(c, 0.4) for *_, c in flussi]
 
 fig = go.Figure(go.Sankey(
     arrangement="snap",
-    node=dict(label=nodi, pad=25, thickness=20),
+    valueformat=".3f",
+    valuesuffix=" kW",
+    node=dict(label=etichette, pad=25, thickness=20),
     link=dict(
         source=[nodi.index(s) for s, *_ in flussi],
         target=[nodi.index(t) for _, _, t, _ in flussi],
