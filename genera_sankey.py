@@ -129,7 +129,12 @@ for s, v, t, c in flussi:
         if n not in nodi:
             nodi.append(n)
 
-colori_link = [(c + "99") if c != GRIGIO else "#99999966" for *_, c in flussi]
+def rgba(hex_color, alpha):
+    h = hex_color.lstrip("#")
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
+
+colori_link = [rgba(c, 0.6) if c != GRIGIO else rgba(c, 0.4) for *_, c in flussi]
 
 fig = go.Figure(go.Sankey(
     arrangement="snap",
