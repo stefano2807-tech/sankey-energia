@@ -33,7 +33,7 @@ def latest(ftp, prefix):
     try:
         for name, facts in ftp.mlsd(facts=["modify", "type"]):
             if facts.get("type") == "file" and pat.match(name):
-                cands.append((facts["modify"], name))
+                cands.append((facts.get("modify", "")[:14], name))
     except ftplib.error_perm:
         for name in ftp.nlst():
             if pat.match(name):
@@ -41,10 +41,23 @@ def latest(ftp, prefix):
                     m = ftp.sendcmd("MDTM " + name)[4:].strip()
                 except Exception:
                     m = "19700101000000"
-                cands.append((m, name))
+                cands.append((m[:14], name))
     if not cands:
         raise SystemExit(f"Nessun file {prefix}_*.csv trovato")
-    return max(cands)  # (data modifica, nome)
+
+    def stamp_nome(nome):
+        m = re.search(r"(\d{14})", nome)
+        return m.group(1) if m else "00000000000000"
+
+    # ordina prima per data scritta nel nome, poi per data di modifica
+    cands.sort(key=lambda c: (stamp_nome(c[1]), c[0]))
+    print(f"Prefisso {prefix}: {len(cands)} file trovati, ultimi:")
+    for mod, nome in cands[-3:]:
+        print(f"   {nome} (modifica server {mod})")
+
+    scelto = cands[-1]
+    stamp = stamp_nome(scelto[1])
+    return (stamp if stamp != "00000000000000" else scelto[0]), scelto[1]
 
 
 def col_idx(letters):
