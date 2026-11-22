@@ -129,13 +129,76 @@ flussi = [
 
 os.makedirs("output", exist_ok=True)
 
-# 1) testo nel formato SankeyMATIC
+# 1) testo nel formato SankeyMATIC (flussi + impostazioni + spostamenti)
+IMPOSTAZIONI = """
+size w 800
+  h 700
+margin l 4
+  r 40
+  t 83
+  b 0
+bg color #ffffff
+  transparent N
+node w 7
+  h 49
+  spacing 50.5
+  border 10
+  theme c
+  color #888888
+  opacity 0
+flow curvature 0.5
+  inheritfrom none
+  color #ec1313
+  opacity 0.45
+layout order automatic
+  justifyorigins N
+  justifyends N
+  reversegraph N
+  attachincompletesto nearest
+labels color #000000
+  hide N
+  highlight 0.55
+  fontface sans-serif
+  linespacing 0.2
+  relativesize 115
+  magnify 110
+labelname appears Y
+  size 15
+  weight 400
+labelvalue appears Y
+  fullprecision Y
+  position above
+  weight 400
+labelposition autoalign 1
+  scheme auto
+  first before
+  breakpoint 5
+value format ',.'
+  prefix ''
+  suffix ' kW'
+themeoffset a 5
+  b 6
+  c 0
+  d 0
+meta mentionsankeymatic N
+  listimbalances Y
+
+// === Moved Nodes ===
+
+move Potenza esportata dal fotovoltaico -0.00232, -0.21948
+move Potenza Ed. Laboratorio 0, -0.24171
+move Potenza UTA-Clima -0.06257, -0.03342
+move Potenza altre utenze -0.0672, -0.18749
+move Potenza Ed. Principale 0.08575, 0.01727
+"""
+
 with open("output/sankeymatic.txt", "w", encoding="utf-8") as fh:
     for s, v, t, c in flussi:
         colore = f" {c}" if c != GRIGIO else ""
         fh.write(f"{s} [{v:g}] {t}{colore}\n")
+    fh.write("\n" + IMPOSTAZIONI.strip() + "\n")
 
-# 2) immagine
+# 2) immagine (stessi parametri di SankeyMATIC, per quanto possibile)
 nodi = []
 for s, v, t, c in flussi:
     for n in (s, t):
@@ -148,7 +211,8 @@ uscita = {n: 0 for n in nodi}
 for s, v, t, c in flussi:
     uscita[s] += v
     entrata[t] += v
-etichette = [f"{n}<br>{max(entrata[n], uscita[n]):.3f} kW" for n in nodi]
+# valore sopra, nome sotto (labelvalue position above)
+etichette = [f"{max(entrata[n], uscita[n]):,.3f} kW<br>{n}" for n in nodi]
 
 
 def rgba(hex_color, alpha):
@@ -157,13 +221,47 @@ def rgba(hex_color, alpha):
     return f"rgba({r},{g},{b},{alpha})"
 
 
-colori_link = [rgba(c, 0.6) if c != GRIGIO else rgba(c, 0.4) for *_, c in flussi]
+# i flussi senza colore usano il colore di default di SankeyMATIC (#ec1313)
+FLUSSO_DEFAULT = "#ec1313"
+colori_link = [rgba(FLUSSO_DEFAULT if c == GRIGIO else c, 0.45)
+               for *_, c in flussi]
+
+# posizioni: colonna (x) e altezza (y) di base, a cui si somma lo "move"
+# di SankeyMATIC. Valori da 0 a 1 (y=0 in alto).
+BASE = {
+    "Potenza importata dalla rete":       (0.001, 0.30),
+    "Potenza esportata dal fotovoltaico": (0.001, 0.85),
+    TOT:                                  (0.34, 0.55),
+    "Potenza Ed. Principale":             (0.67, 0.30),
+    "Potenza Ed. Laboratorio":            (0.67, 0.75),
+    "Potenza UTA-Clima":                  (0.999, 0.65),
+    "Potenza altre utenze":               (0.999, 0.95),
+}
+MOVE = {
+    "Potenza esportata dal fotovoltaico": (-0.00232, -0.21948),
+    "Potenza Ed. Laboratorio":            (0, -0.24171),
+    "Potenza UTA-Clima":                  (-0.06257, -0.03342),
+    "Potenza altre utenze":               (-0.0672, -0.18749),
+    "Potenza Ed. Principale":             (0.08575, 0.01727),
+}
+
+
+def pos(n):
+    x, y = BASE[n]
+    dx, dy = MOVE.get(n, (0, 0))
+    return (min(max(x + dx, 0.001), 0.999),
+            min(max(y + dy, 0.001), 0.999))
+
+
+xs = [pos(n)[0] for n in nodi]
+ys = [pos(n)[1] for n in nodi]
 
 fig = go.Figure(go.Sankey(
-    arrangement="snap",
-    valueformat=".3f",
+    arrangement="fixed",
+    valueformat=",.3f",
     valuesuffix=" kW",
-    node=dict(label=etichette, pad=25, thickness=20),
+    node=dict(label=etichette, x=xs, y=ys, pad=50, thickness=7,
+              color="#888888", line=dict(color="#888888", width=0)),
     link=dict(
         source=[nodi.index(s) for s, *_ in flussi],
         target=[nodi.index(t) for _, _, t, _ in flussi],
@@ -172,8 +270,13 @@ fig = go.Figure(go.Sankey(
     ),
 ))
 fig.update_layout(
-    title=f"Flussi di potenza - {PERIODO} - Dati aggiornati al {ultimo}",
-    font_size=12, width=900, height=450, paper_bgcolor="white",
+    title=dict(text=f"Flussi di potenza - {PERIODO}<br>"
+                    f"<sup>Dati aggiornati al {ultimo}</sup>",
+               x=0.02),
+    font=dict(family="sans-serif", size=15, color="#000000"),
+    width=800, height=700,
+    margin=dict(l=4, r=40, t=83, b=0),
+    paper_bgcolor="#ffffff",
 )
 fig.write_image("output/sankey.png", scale=2)
 
