@@ -173,7 +173,7 @@ fig = go.Figure(go.Sankey(
 ))
 fig.update_layout(
     title=f"Flussi di potenza - {PERIODO} - Dati aggiornati al {ultimo}",
-    font_size=14, width=1400, height=700, paper_bgcolor="white",
+    font_size=12, width=900, height=450, paper_bgcolor="white",
 )
 fig.write_image("output/sankey.png", scale=2)
 
