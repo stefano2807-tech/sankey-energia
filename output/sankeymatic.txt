@@ -1,9 +1,9 @@
-Potenza importata dalla rete [27.361] Potenza totale utilizzata Ottobre 2026 #ec1313
-Potenza esportata dal fotovoltaico [0.232] Potenza totale utilizzata Ottobre 2026 #009900
-Potenza totale utilizzata Ottobre 2026 [13.093] Potenza Ed. Principale
-Potenza totale utilizzata Ottobre 2026 [14.5] Potenza Ed. Laboratorio
-Potenza Ed. Laboratorio [12.598] Potenza UTA-Clima
-Potenza Ed. Laboratorio [1.902] Potenza altre utenze
+Potenza importata dalla rete [24.514] Potenza totale utilizzata Ottobre 2026 #ec1313
+Potenza esportata dal fotovoltaico [0.505] Potenza totale utilizzata Ottobre 2026 #009900
+Potenza totale utilizzata Ottobre 2026 [10.927] Potenza Ed. Principale
+Potenza totale utilizzata Ottobre 2026 [14.092] Potenza Ed. Laboratorio
+Potenza Ed. Laboratorio [10.237] Potenza UTA-Clima
+Potenza Ed. Laboratorio [3.855] Potenza altre utenze
 
 size w 800
   h 700
