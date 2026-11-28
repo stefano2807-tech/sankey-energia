@@ -1,0 +1,20 @@
+name: Pulizia esecuzioni
+on:
+  schedule:
+    - cron: "41 3 * * *"
+  workflow_dispatch:
+permissions:
+  actions: write
+  contents: read
+jobs:
+  pulisci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancella esecuzioni vecchie
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh run list --limit 1000 --json databaseId,createdAt \
+            --jq '.[] | select(.createdAt < (now - 7*86400 | todate)) | .databaseId' \
+          | while read id; do gh run delete "$id" || true; done
